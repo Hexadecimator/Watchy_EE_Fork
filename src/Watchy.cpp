@@ -1,3 +1,8 @@
+/*
+Additional Contributions:
+1. Alex Story - Scrolling Menu Screen [https://gitlab.com/astory024/watchy/-/blob/master/src/Watchy.cpp]
+*/
+
 #include "Watchy.h"
 
 WatchyRTC Watchy::RTC;
@@ -12,6 +17,15 @@ RTC_DATA_ATTR bool BLE_CONFIGURED;
 RTC_DATA_ATTR weatherData currentWeather;
 RTC_DATA_ATTR int weatherIntervalCounter = -1;
 RTC_DATA_ATTR bool displayFullInit       = true;
+
+// constructs for making a scrollable menu screen
+const char *menuItems[] = {
+      "About Watchy", "Vibrate Motor", "Show Accelerometer",
+      "Set Time",     "Setup WiFi",    "Update Firmware",
+      "Sync NTP", "Resistor Colors"};
+
+int16_t menuOptions = sizeof(menuItems) / sizeof(menuItems[0]);	  
+	  
 
 void Watchy::init(String datetime) {
   esp_sleep_wakeup_cause_t wakeup_reason;
@@ -226,6 +240,9 @@ void Watchy::handleButtonPress() {
   }
 }
 
+/*
+scrolling menu thanks to Alex Story's work
+*/
 void Watchy::showMenu(byte menuIndex, bool partialRefresh) {
   display.setFullWindow();
   display.fillScreen(GxEPD_BLACK);
@@ -234,13 +251,15 @@ void Watchy::showMenu(byte menuIndex, bool partialRefresh) {
   int16_t x1, y1;
   uint16_t w, h;
   int16_t yPos;
+  int16_t startPos = 0;
 
-  const char *menuItems[] = {
-      "About Watchy", "Vibrate Motor", "Show Accelerometer",
-      "Set Time",     "Setup WiFi",    "Update Firmware",
-      "Sync NTP", "Resistor Colors"};
-  for (int i = 0; i < MENU_LENGTH; i++) {
-    yPos = MENU_HEIGHT + (MENU_HEIGHT * i);
+  if((menuIndex + MENU_LENGTH) > menuOptions) {
+    startPos = (menuOptions-1) - (MENU_LENGTH-1);
+  }
+  else startPos = menuIndex;
+  
+  for (int i = startPos; i < (MENU_LENGTH + startPos); i++) {
+    yPos = 30 + (MENU_HEIGHT*(i-startPos));
     display.setCursor(0, yPos);
     if (i == menuIndex) {
       display.getTextBounds(menuItems[i], 0, yPos, &x1, &y1, &w, &h);
@@ -258,6 +277,9 @@ void Watchy::showMenu(byte menuIndex, bool partialRefresh) {
   guiState = MAIN_MENU_STATE;
 }
 
+/*
+scrolling menu thanks to Alex Story's work
+*/
 void Watchy::showFastMenu(byte menuIndex) {
   display.setFullWindow();
   display.fillScreen(GxEPD_BLACK);
@@ -266,13 +288,15 @@ void Watchy::showFastMenu(byte menuIndex) {
   int16_t x1, y1;
   uint16_t w, h;
   int16_t yPos;
-
-  const char *menuItems[] = {
-      "About Watchy", "Vibrate Motor", "Show Accelerometer",
-      "Set Time",     "Setup WiFi",    "Update Firmware",
-      "Sync NTP", "Resistor Colors"};
-  for (int i = 0; i < MENU_LENGTH; i++) {
-    yPos = MENU_HEIGHT + (MENU_HEIGHT * i);
+  int16_t startPos = 0;
+  
+  if((menuIndex + MENU_LENGTH) > menuOptions) {
+    startPos = (menuOptions-1) - (MENU_LENGTH-1);
+  }
+  else startPos = menuIndex;
+  
+  for (int i = startPos; i < (MENU_LENGTH + startPos); i++) {
+    yPos = 30 + (MENU_HEIGHT*(i-startPos));
     display.setCursor(0, yPos);
     if (i == menuIndex) {
       display.getTextBounds(menuItems[i], 0, yPos, &x1, &y1, &w, &h);
