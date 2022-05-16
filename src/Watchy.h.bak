@@ -62,7 +62,6 @@ public:
   void showSyncNTP();
   bool syncNTP();
   bool syncNTP(long gmt, int dst, String ntpServer);
-  void showResistorColorCodeApp();
   void setTime();
   void setupWifi();
   bool connectWiFi();
