@@ -1,4 +1,4 @@
-# Watchy - Fully Open Source E-Paper Watch
+# Watchy - Fully Open Source E-Paper Watch (Hexadecimator Electrical Engineering Fork!!)
 
 ![Watchy](https://watchy.sqfmi.com/img/watchy_render.png)
 
