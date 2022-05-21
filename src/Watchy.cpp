@@ -1,6 +1,5 @@
 /*
 Additional Contributions:
-1. Alex Story - Scrolling Menu Screen [https://gitlab.com/astory024/watchy/-/blob/master/src/Watchy.cpp]
 */
 
 #include "Watchy.h"
@@ -22,7 +21,7 @@ RTC_DATA_ATTR bool displayFullInit       = true;
 const char *menuItems[] = {
       "About Watchy", "Vibrate Motor", "Show Accelerometer",
       "Set Time",     "Setup WiFi",    "Update Firmware",
-      "Sync NTP", "Resistor Colors"};
+      "Sync NTP", "Resistor Colors", "Common Units", "Common Equations"};
 
 int16_t menuOptions = sizeof(menuItems) / sizeof(menuItems[0]);	  
 	  
@@ -111,9 +110,15 @@ void Watchy::handleButtonPress() {
       case 6:
         showSyncNTP();
         break;
-	  case 7:
-		showResistorColorCodeApp();
-		break;
+      case 7:
+        showResistorColorCodeApp();
+        break;
+      case 8:
+        showUnitsApp();
+        break;
+      case 9:
+        showEquationsApp();
+        break;
       default:
         break;
       }
@@ -143,6 +148,7 @@ void Watchy::handleButtonPress() {
       }
       showMenu(menuIndex, true);
     } else if (guiState == WATCHFACE_STATE) {
+      // TODO: Can assign up button @ watchface state to an action here
       return;
     }
   }
@@ -155,6 +161,7 @@ void Watchy::handleButtonPress() {
       }
       showMenu(menuIndex, true);
     } else if (guiState == WATCHFACE_STATE) {
+      // TODO: Can assign down button @ watchface state to an action here
       return;
     }
   }
@@ -196,9 +203,15 @@ void Watchy::handleButtonPress() {
           case 6:
             showSyncNTP();
             break;
-		  case 7:
-		    showResistorColorCodeApp();
-			break;
+          case 7:
+            showResistorColorCodeApp();
+			      break;
+          case 8:
+            showUnitsApp();
+			      break;
+          case 9:
+            showEquationsApp();
+			      break;
           default:
             break;
           }
@@ -240,9 +253,6 @@ void Watchy::handleButtonPress() {
   }
 }
 
-/*
-scrolling menu thanks to Alex Story's work
-*/
 void Watchy::showMenu(byte menuIndex, bool partialRefresh) {
   display.setFullWindow();
   display.fillScreen(GxEPD_BLACK);
@@ -251,36 +261,43 @@ void Watchy::showMenu(byte menuIndex, bool partialRefresh) {
   int16_t x1, y1;
   uint16_t w, h;
   int16_t yPos;
-  int16_t startPos = 0;
+  int16_t startIdx = menuIndex - 3;
 
-  if((menuIndex + MENU_LENGTH) > menuOptions) {
-    startPos = (menuOptions-1) - (MENU_LENGTH-1);
+  if (startIdx < 0) {
+    startIdx = startIdx + (MENU_LENGTH);
   }
-  else startPos = menuIndex;
-  
-  for (int i = startPos; i < (MENU_LENGTH + startPos); i++) {
-    yPos = 30 + (MENU_HEIGHT*(i-startPos));
+
+  for(int i = 0; i < 7; i++) {
+    yPos = 30 + MENU_HEIGHT*i;
     display.setCursor(0, yPos);
-    if (i == menuIndex) {
-      display.getTextBounds(menuItems[i], 0, yPos, &x1, &y1, &w, &h);
-      display.fillRect(x1 - 1, y1 - 10, 200, h + 12, GxEPD_WHITE);
+    if(i == 3) {
+      display.getTextBounds(menuItems[startIdx], 0, yPos, &x1, &y1, &w, &h);
+      display.fillRect(x1 - 1, y1 - 10, 200, h + 15, GxEPD_WHITE);
       display.setTextColor(GxEPD_BLACK);
-      display.println(menuItems[i]);
-    } else {
+      display.println(menuItems[startIdx]);
+    }
+    else {
       display.setTextColor(GxEPD_WHITE);
-      display.println(menuItems[i]);
+      display.println(menuItems[startIdx]);
+    }
+
+    startIdx++;
+    if(startIdx > (MENU_LENGTH-1)) {
+      startIdx = 0;
     }
   }
 
   display.display(partialRefresh);
-
   guiState = MAIN_MENU_STATE;
 }
 
-/*
-scrolling menu thanks to Alex Story's work
-*/
 void Watchy::showFastMenu(byte menuIndex) {
+  // our current menuIndex option is always going to appear
+  // in the middle of the screen. We'll display 7 total menu
+  // items at a time because 7 items fit on the screen cleanly.
+  // We will display the 3 items in menuItems before, and 3 items
+  // in menuItems after the current menuIndex
+  // This will provide the experience of a menu that "scrolls"
   display.setFullWindow();
   display.fillScreen(GxEPD_BLACK);
   display.setFont(&FreeMonoBold9pt7b);
@@ -288,29 +305,33 @@ void Watchy::showFastMenu(byte menuIndex) {
   int16_t x1, y1;
   uint16_t w, h;
   int16_t yPos;
-  int16_t startPos = 0;
-  
-  if((menuIndex + MENU_LENGTH) > menuOptions) {
-    startPos = (menuOptions-1) - (MENU_LENGTH-1);
+  int16_t startIdx = menuIndex - 3;
+
+  if (startIdx < 0) {
+    startIdx = startIdx + (MENU_LENGTH);
   }
-  else startPos = menuIndex;
-  
-  for (int i = startPos; i < (MENU_LENGTH + startPos); i++) {
-    yPos = 30 + (MENU_HEIGHT*(i-startPos));
+
+  for(int i = 0; i < 7; i++) {
+    yPos = 30 + MENU_HEIGHT*i;
     display.setCursor(0, yPos);
-    if (i == menuIndex) {
-      display.getTextBounds(menuItems[i], 0, yPos, &x1, &y1, &w, &h);
-      display.fillRect(x1 - 1, y1 - 10, 200, h + 12, GxEPD_WHITE);
+    if(i == 3) { // selected item is always in middle
+      display.getTextBounds(menuItems[startIdx], 0, yPos, &x1, &y1, &w, &h);
+      display.fillRect(x1 - 1, y1 - 10, 200, h + 15, GxEPD_WHITE);
       display.setTextColor(GxEPD_BLACK);
-      display.println(menuItems[i]);
-    } else {
+      display.println(menuItems[startIdx]);
+    }
+    else {
       display.setTextColor(GxEPD_WHITE);
-      display.println(menuItems[i]);
+      display.println(menuItems[startIdx]);
+    }
+
+    startIdx++;
+    if(startIdx > (MENU_LENGTH-1)) {
+      startIdx = 0;
     }
   }
 
   display.display(true);
-
   guiState = MAIN_MENU_STATE;
 }
 
@@ -1288,4 +1309,32 @@ void Watchy::showResistorColorCodeApp() {
   }
   
   showMenu(menuIndex, false);
+}
+
+void Watchy::showUnitsApp()
+{
+	display.fillScreen(GxEPD_BLACK);
+    display.setTextColor(GxEPD_WHITE);
+    display.setFont(&FreeMonoBold9pt7b);
+	display.setCursor(0, 20);
+	display.println("TODO: INSIDE showUnitsApp()");
+	display.println("DX DX DX DX");
+	display.display(true);
+	delay(3000);
+	showMenu(menuIndex, false);
+}
+
+
+
+void Watchy::showEquationsApp()
+{
+	display.fillScreen(GxEPD_BLACK);
+    display.setTextColor(GxEPD_WHITE);
+    display.setFont(&FreeMonoBold9pt7b);
+	display.setCursor(0, 20);
+	display.println("TODO: INSIDE showEquationsApp()");
+	display.println("DX DX DX DX");
+	display.display(true);
+	delay(3000);
+	showMenu(menuIndex, false);
 }

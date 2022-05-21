@@ -14,6 +14,7 @@
 #define VIB_MOTOR_PIN 13
 #define RTC_INT_PIN 27
 
+#define ARDUINO_WATCHY_V20 1
 
 #if !defined(ARDUINO_WATCHY_V10) && !defined(ARDUINO_WATCHY_V15) && !defined(ARDUINO_WATCHY_V20)
     #warning Hardware revision is not defined at the project level. Using hard-coded value
@@ -48,14 +49,14 @@
 #define DISPLAY_HEIGHT 200
 // wifi
 #define WIFI_AP_TIMEOUT 30
-#define WIFI_AP_SSID    "WHYAREWEYELLING2.4"
+#define WIFI_AP_SSID "WHYAREWEYELLING2.4"
 // menu
 #define WATCHFACE_STATE -1
 #define MAIN_MENU_STATE 0
 #define APP_STATE       1
 #define FW_UPDATE_STATE 2
-#define MENU_HEIGHT     22
-#define MENU_LENGTH     8
+#define MENU_HEIGHT     25
+#define MENU_LENGTH     10
 // set time
 #define SET_HOUR   0
 #define SET_MINUTE 1

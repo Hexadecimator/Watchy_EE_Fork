@@ -1,3 +1,8 @@
+/*
+Additional Contributions:
+1. Alex Story - Scrolling Menu Screen [https://gitlab.com/astory024/watchy/-/blob/master/src/Watchy.cpp]
+*/
+
 #include "Watchy.h"
 
 WatchyRTC Watchy::RTC;
@@ -12,6 +17,15 @@ RTC_DATA_ATTR bool BLE_CONFIGURED;
 RTC_DATA_ATTR weatherData currentWeather;
 RTC_DATA_ATTR int weatherIntervalCounter = -1;
 RTC_DATA_ATTR bool displayFullInit       = true;
+
+// constructs for making a scrollable menu screen
+const char *menuItems[] = {
+      "About Watchy", "Vibrate Motor", "Show Accelerometer",
+      "Set Time",     "Setup WiFi",    "Update Firmware",
+      "Sync NTP", "Resistor Colors", "Common Units", "Common Equations"};
+
+int16_t menuOptions = sizeof(menuItems) / sizeof(menuItems[0]);	  
+	  
 
 void Watchy::init(String datetime) {
   esp_sleep_wakeup_cause_t wakeup_reason;
@@ -99,6 +113,12 @@ void Watchy::handleButtonPress() {
         break;
 	  case 7:
 		showResistorColorCodeApp();
+		break;
+	  case 8:
+		showUnitsApp();
+		break;
+	  case 9:
+		showEquationsApp();
 		break;
       default:
         break;
@@ -226,6 +246,9 @@ void Watchy::handleButtonPress() {
   }
 }
 
+/*
+scrolling menu thanks to Alex Story's work
+*/
 void Watchy::showMenu(byte menuIndex, bool partialRefresh) {
   display.setFullWindow();
   display.fillScreen(GxEPD_BLACK);
@@ -234,17 +257,19 @@ void Watchy::showMenu(byte menuIndex, bool partialRefresh) {
   int16_t x1, y1;
   uint16_t w, h;
   int16_t yPos;
+  int16_t startPos = 0;
 
-  const char *menuItems[] = {
-      "About Watchy", "Vibrate Motor", "Show Accelerometer",
-      "Set Time",     "Setup WiFi",    "Update Firmware",
-      "Sync NTP", "Res. Color Calc"};
-  for (int i = 0; i < MENU_LENGTH; i++) {
-    yPos = MENU_HEIGHT + (MENU_HEIGHT * i);
+  if((menuIndex + MENU_LENGTH) > menuOptions) {
+    startPos = (menuOptions-1) - (MENU_LENGTH-1);
+  }
+  else startPos = menuIndex;
+  
+  for (int i = startPos; i < (MENU_LENGTH + startPos); i++) {
+    yPos = 30 + (MENU_HEIGHT*(i-startPos));
     display.setCursor(0, yPos);
     if (i == menuIndex) {
       display.getTextBounds(menuItems[i], 0, yPos, &x1, &y1, &w, &h);
-      display.fillRect(x1 - 1, y1 - 10, 200, h + 10, GxEPD_WHITE);
+      display.fillRect(x1 - 1, y1 - 10, 200, h + 15, GxEPD_WHITE);
       display.setTextColor(GxEPD_BLACK);
       display.println(menuItems[i]);
     } else {
@@ -258,6 +283,9 @@ void Watchy::showMenu(byte menuIndex, bool partialRefresh) {
   guiState = MAIN_MENU_STATE;
 }
 
+/*
+scrolling menu thanks to Alex Story's work
+*/
 void Watchy::showFastMenu(byte menuIndex) {
   display.setFullWindow();
   display.fillScreen(GxEPD_BLACK);
@@ -266,17 +294,19 @@ void Watchy::showFastMenu(byte menuIndex) {
   int16_t x1, y1;
   uint16_t w, h;
   int16_t yPos;
-
-  const char *menuItems[] = {
-      "About Watchy", "Vibrate Motor", "Show Accelerometer",
-      "Set Time",     "Setup WiFi",    "Update Firmware",
-      "Sync NTP", "Res. Color Calc"};
-  for (int i = 0; i < MENU_LENGTH; i++) {
-    yPos = MENU_HEIGHT + (MENU_HEIGHT * i);
+  int16_t startPos = 0;
+  
+  if((menuIndex + MENU_LENGTH) > menuOptions) {
+    startPos = (menuOptions-1) - (MENU_LENGTH-1);
+  }
+  else startPos = menuIndex;
+  
+  for (int i = startPos; i < (MENU_LENGTH + startPos); i++) {
+    yPos = 30 + (MENU_HEIGHT*(i-startPos));
     display.setCursor(0, yPos);
     if (i == menuIndex) {
       display.getTextBounds(menuItems[i], 0, yPos, &x1, &y1, &w, &h);
-      display.fillRect(x1 - 1, y1 - 10, 200, h + 10, GxEPD_WHITE);
+      display.fillRect(x1 - 1, y1 - 10, 200, h + 15, GxEPD_WHITE);
       display.setTextColor(GxEPD_BLACK);
       display.println(menuItems[i]);
     } else {
@@ -308,6 +338,11 @@ void Watchy::showAbout() {
   float voltage = getBatteryVoltage();
   display.print(voltage);
   display.println("V");
+
+  display.print("HW REV: ");
+  display.print(HARDWARE_VERSION_MAJOR);
+  display.print(".");
+  display.println(HARDWARE_VERSION_MINOR);
 
   display.display(false); // full refresh
 
@@ -996,24 +1031,30 @@ bool Watchy::syncNTP(long gmt, int dst,
 void Watchy::showResistorColorCodeApp() {
   guiState = APP_STATE;
 
-  //enum ValueBand { black, brown, red, orange, yellow, green, blue, purple, silver, white, off };
-  int8_t vband_idx_max = 10; // 10 elements in ValueBand enum
+  // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, off
+  const char *ValueBands[11] = {"black", "brown", "red", "orange", "yellow", "green", "blue", "purple", "silver", "white", "off"};
+  const char *ValueBandValues[11] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "-"};
+  int8_t vband_1_idx   = 0; // default black
+  int8_t vband_2_idx   = 0; // default black
+  int8_t vband_3_idx   = 10; // default to off (not shown)
+  int8_t vband_idx_max = 10;
+  
   // 1, 10, 100, 1000, 10000, 100000, 1000000, 0.1, 0.01
-  //enum MultiplierBand { black, brown, red, orange, yellow, green, blue, gold, silver }; 
+  const char *MultiplierBands[9] = {"black", "brown", "red", "orange", "yellow", "green", "blue", "gold", "silver"};
+  const char *MultiplierBandValues[9] = {"", "x10", "x10^2", "x10^3", "x10^4", "x10^5", "x10^6", "x10^-1", "x10^-2"};
+  int8_t mband_idx     = 0; // default to black
   int8_t mband_idx_max = 8;
+  
   // 1%, 2%, 5%, 10%
-  //enum ToleranceBand { brown, red, gold, silver };
+  const char *ToleranceBands[4] = {"brown", "red", "gold", "silver"};
+  const char *ToleranceBandValues[4] = {"(1% Tolerance)", "(2% Tolerance)", "(5% Tolerance)", "(10% Tolerance)"};
+  int8_t tband_idx = 2; // default to gold
   int8_t tband_idx_max = 3;
   
-  int8_t blink = 0;
-  int8_t band_idx = 0; // index of what band we are manipulating. Default to vband_1
-  int8_t bands = 5; // 3 vbands, multiplier band, tolerance band
+  int8_t blink      = 0;
+  int8_t band_idx   = 0; // index of what band we are manipulating. Default to vband_1
+  int8_t bands      = 5; // 3 value bands, multiplier band, tolerance band
   int8_t band_level = 0; // 0 = traversing bands, 1 = traversing values
-  int8_t vband_1_idx = 0; // default black
-  int8_t vband_2_idx = 0; // default black
-  int8_t vband_3_idx = 10; // default to off (0)
-  int8_t mband_idx = 0; // default to black
-  int8_t tband_idx = 2; // default to gold
   
   pinMode(DOWN_BTN_PIN, INPUT);
   pinMode(UP_BTN_PIN, INPUT);
@@ -1031,7 +1072,6 @@ void Watchy::showResistorColorCodeApp() {
 	  }
 	  else if (band_level == 1) {
 		// exit band value selection
-		// proceed to next band or exit
 		band_level = 0;
 		band_idx++;
 	  }
@@ -1072,31 +1112,31 @@ void Watchy::showResistorColorCodeApp() {
 		switch(band_idx) {
 			case 0: // vband1
 				vband_1_idx++;
-				if(vband_1_idx >= vband_idx_max) {
+				if(vband_1_idx > vband_idx_max) {
 					vband_1_idx = 0; // reset back to start
 				}
 				break;
 			case 1: // vband2
 				vband_2_idx++;
-				if(vband_2_idx >= vband_idx_max) {
+				if(vband_2_idx > vband_idx_max) {
 					vband_2_idx = 0; // reset back to start
 				}
 				break;
 			case 2: // vband3
 				vband_3_idx++;
-				if(vband_3_idx >= vband_idx_max) {
+				if(vband_3_idx > vband_idx_max) {
 					vband_3_idx = 0; // reset back to start
 				}
 				break;
 			case 3: // mband
 				mband_idx++;
-				if(mband_idx >= mband_idx_max) {
+				if(mband_idx > mband_idx_max) {
 					mband_idx = 0; // reset back to start
 				}
 				break;
 			case 4: // tband
 				tband_idx++;
-				if(tband_idx >= tband_idx_max) {
+				if(tband_idx > tband_idx_max) {
 					tband_idx = 0; // reset back to start
 				}
 				break;
@@ -1106,7 +1146,7 @@ void Watchy::showResistorColorCodeApp() {
 	  }
     }
 
-	if (digitalRead(UP_BTN_PIN == 1)) {
+	if (digitalRead(UP_BTN_PIN) == 1) {
 	  blink = 1;
 	  // do up button stuff
 	  if(band_level == 0) {
@@ -1160,277 +1200,127 @@ void Watchy::showResistorColorCodeApp() {
 	// at this point we have:
 	// band_level - root menu or selecting values
 	// band_idx  - which band we're manipulating
-	// v/m/tband_idx - current enum index of band's value
+	// v/m/tband_idx - current index of current band's value
 	
-	// draw vband1:
+	// *********** START SCREEN DRAWING SECTION ***********
+	
+	  // ----------------------- |
+  	 // ------ draw vband1 ----- |
+	// ------------------------- |
 	display.setCursor(0, 20);
+	display.println("-COLOR BAND CALC-");
 	if((band_idx == 0) && (band_level == 0)) {
 		display.setTextColor(blink ? GxEPD_WHITE : GxEPD_BLACK);
 	}
-	display.print("value 1: ");
+	display.print("BAND-1 = ");
 	if((band_idx == 0) && (band_level == 1)) {
 		display.setTextColor(blink ? GxEPD_WHITE : GxEPD_BLACK);
 	}
-	switch(vband_1_idx) {
-		case 0:
-			display.print("black");
-			break;
-		case 1:
-			display.print("brown");
-			break;
-		case 2:
-			display.print("red");
-			break;
-		case 3:
-			display.print("orange");
-			break;
-		case 4:
-			display.print("yellow");
-			break;
-		case 5:
-			display.print("green");
-			break;
-		case 6:
-			display.print("blue");
-			break;
-		case 7:
-			display.print("purple");
-			break;
-		case 8:
-			display.print("silver");
-			break;
-		case 9:
-			display.print("white");
-			break;
-		case 10:
-			display.print("off");
-			break;
-		default:
-			break;
-	}
+	display.println(ValueBands[vband_1_idx]);
 	display.setTextColor(GxEPD_WHITE);
-	
-	
-	
-	// draw vband2:
-	display.setCursor(0, 40);
+
+	  // ----------------------- |
+  	 // ------ draw vband2 ----- |
+	// ------------------------- |
 	if((band_idx == 1) && (band_level == 0)) {
 		display.setTextColor(blink ? GxEPD_WHITE : GxEPD_BLACK);
 	}
-	display.print("value 2: ");
+	display.print("BAND-2 = ");
 	if((band_idx == 1) && (band_level == 1)) {
 		display.setTextColor(blink ? GxEPD_WHITE : GxEPD_BLACK);
 	}
-	switch(vband_2_idx) {
-		case 0:
-			display.print("black");
-			break;
-		case 1:
-			display.print("brown");
-			break;
-		case 2:
-			display.print("red");
-			break;
-		case 3:
-			display.print("orange");
-			break;
-		case 4:
-			display.print("yellow");
-			break;
-		case 5:
-			display.print("green");
-			break;
-		case 6:
-			display.print("blue");
-			break;
-		case 7:
-			display.print("purple");
-			break;
-		case 8:
-			display.print("silver");
-			break;
-		case 9:
-			display.print("white");
-			break;
-		case 10:
-			display.print("off");
-			break;
-		default:
-			break;
-	}
-	
+	display.println(ValueBands[vband_2_idx]);
 	display.setTextColor(GxEPD_WHITE);
 	
-	// draw vband3:
-	display.setCursor(0, 60);
+	  // ----------------------- |
+  	 // ------ draw vband3 ----- |
+	// ------------------------- |
 	if((band_idx == 2) && (band_level == 0)) {
 		display.setTextColor(blink ? GxEPD_WHITE : GxEPD_BLACK);
 	}
-	display.print("value 3: ");
+	display.print("BAND-3 = ");
 	if((band_idx == 2) && (band_level == 1)) {
 		display.setTextColor(blink ? GxEPD_WHITE : GxEPD_BLACK);
 	}
-	switch(vband_3_idx) {
-		case 0:
-			display.print("black");
-			break;
-		case 1:
-			display.print("brown");
-			break;
-		case 2:
-			display.print("red");
-			break;
-		case 3:
-			display.print("orange");
-			break;
-		case 4:
-			display.print("yellow");
-			break;
-		case 5:
-			display.print("green");
-			break;
-		case 6:
-			display.print("blue");
-			break;
-		case 7:
-			display.print("purple");
-			break;
-		case 8:
-			display.print("silver");
-			break;
-		case 9:
-			display.print("white");
-			break;
-		case 10:
-			display.print("off");
-			break;
-		default:
-			break;
-	}
-	
+	display.println(ValueBands[vband_3_idx]);
 	display.setTextColor(GxEPD_WHITE);
 	
-	// draw mband:
-	display.setCursor(0, 80);
+	  // ----------------------- |
+  	 // ------ draw mband- ----- |
+	// ------------------------- |
 	if((band_idx == 3) && (band_level == 0)) {
 		display.setTextColor(blink ? GxEPD_WHITE : GxEPD_BLACK);
 	}
-	display.print("multiplier: ");
+	display.print("MULTI = ");
 	if((band_idx == 3) && (band_level == 1)) {
 		display.setTextColor(blink ? GxEPD_WHITE : GxEPD_BLACK);
 	}
-	switch(mband_idx) {
-		case 0:
-			display.print("black");
-			break;
-		case 1:
-			display.print("brown");
-			break;
-		case 2:
-			display.print("red");
-			break;
-		case 3:
-			display.print("orange");
-			break;
-		case 4:
-			display.print("yellow");
-			break;
-		case 5:
-			display.print("green");
-			break;
-		case 6:
-			display.print("blue");
-			break;
-		case 7:
-			display.print("gold");
-			break;
-		case 8:
-			display.print("silver");
-			break;
-		default:
-			break;
-	}
-	
+	display.println(MultiplierBands[mband_idx]);
 	display.setTextColor(GxEPD_WHITE);
 	
-	// draw tband:
-	display.setCursor(0, 100);
+	  // ----------------------- |
+  	 // ------ draw tband ----- |
+	// ------------------------- |
 	if((band_idx == 4) && (band_level == 0)) {
 		display.setTextColor(blink ? GxEPD_WHITE : GxEPD_BLACK);
 	}
-	display.print("tolerance: ");
+	display.print("TOL = ");
 	if((band_idx == 4) && (band_level == 1)) {
 		display.setTextColor(blink ? GxEPD_WHITE : GxEPD_BLACK);
 	}
-	switch(tband_idx) {
-		case 0:
-			display.print("brown");
-			break;
-		case 1:
-			display.print("red");
-			break;
-		case 2:
-			display.print("gold");
-			break;
-		case 3:
-			display.print("silver");
-			break;
-		default:
-			break;
-	}
-	
+	display.println(ToleranceBands[tband_idx]);
 	display.setTextColor(GxEPD_WHITE);
 	
-	display.setCursor(0, 120);
-	display.print("Resistor Value: ");
-	display.setCursor(0, 140);
-	// print val1
-	display.print(vband_1_idx, DEC);
-	// print val2
-	display.print(vband_2_idx, DEC);
-	// print val3
+	  // ------------------------------------------------------ |
+  	 // ------ parse and draw calculated resistance value ----- |
+	// -------------------------------------------------------- |
+	display.println("Resistor Value: ");
+	display.print(ValueBandValues[vband_1_idx]);
+	display.print(ValueBandValues[vband_2_idx]);
+
+	// print val3 (skip if OFF)
 	if(vband_3_idx != 10) { // not equal to "off"
-		display.print(vband_3_idx, DEC);
-	}
-	// print multiplier
-	if(mband_idx == 0) {
-		// no zeros, skip
-	}
-	else if (mband_idx == 7) {
-		// x10^-1
-		display.print("x10^-1");
-	}
-	else if (mband_idx == 8) {
-		// x10^-2
-		display.print("x10^-2");
-	}
-	else {
-		display.print("x10^");
-		display.print(mband_idx, DEC);
+		display.print(ValueBandValues[vband_3_idx]);
 	}
 	
-	// print tolerance
-	display.print(" Ohms. (");
-	switch(tband_idx) {
-		case 0:
-			display.print("1%");
-			break;
-		case 1:
-			display.print("2%");
-			break;
-		case 2:
-			display.print("5%");
-			break;
-		case 3:
-			display.print("10%");
-			break;
-		default:
-			break;
-	}
-	display.print(")");
+	display.println(MultiplierBandValues[mband_idx]);
+	display.println("OHMS.");
+	display.print(ToleranceBandValues[tband_idx]);
 	
+	  // ----------------------------|
+	 // -- partial refresh display --|
+	// ----------------------------- |
 	display.display(true);
   }
   
   showMenu(menuIndex, false);
+}
+
+void showUnitsApp()
+{
+	// TODO
+	display.fillScreen(GxEPD_BLACK);
+    display.setTextColor(GxEPD_WHITE);
+    display.setFont(&FreeMonoBold9pt7b);
+	display.setCursor(0, 20);
+	display.println("TODO: INSIDE showUnitsApp()");
+	display.println("DX DX DX DX");
+	display.display(true);
+	delay(3000);
+	showMenu(menuIndex, false);
+}
+
+
+
+void showEquationsApp()
+{
+	display.fillScreen(GxEPD_BLACK);
+    display.setTextColor(GxEPD_WHITE);
+    display.setFont(&FreeMonoBold9pt7b);
+	display.setCursor(0, 20);
+	display.println("TODO: INSIDE showEquationsApp()");
+	display.println("DX DX DX DX");
+	display.display(true);
+	delay(3000);
+	showMenu(menuIndex, false);
 }
